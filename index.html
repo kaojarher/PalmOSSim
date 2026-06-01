@@ -1232,7 +1232,16 @@
         tokenClient.requestAccessToken({ prompt: 'consent' });
     }
     async function findBackupFile() {
-        const res = await fetch("https://www.googleapis.com/drive/v3/files?q=name='palm_os_backup.json' and trashed=false", { headers: { Authorization: 'Bearer ' + accessToken } });
+        const query = encodeURIComponent("name='palm_os_backup.json' and trashed=false");
+        const res = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`,
+            { headers: { Authorization: 'Bearer ' + accessToken, Accept: 'application/json' } }
+        );
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error('findBackupFile HTTP error:', res.status, errText);
+            throw new Error('查詢備份檔失敗（HTTP ' + res.status + '）');
+        }
         const data = await res.json();
         return data.files && data.files.length > 0 ? data.files[0].id : null;
     }
@@ -1299,7 +1308,8 @@
                 statusEl.style.color = "red";
             }
         } catch (err) {
-            statusEl.innerText = "狀態：下載失敗，請確認網路連線。";
+            const msg = err && err.message ? err.message : String(err);
+            statusEl.innerText = "狀態：" + msg;
             statusEl.style.color = "red";
             console.error('downloadFromDrive error:', err);
         }
