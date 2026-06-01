@@ -1183,7 +1183,12 @@
     // ========================
     // Google Drive HotSync
     // ========================
-    window.onload = function () {
+
+    function initTokenClient() {
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+            return false;
+        }
+        if (tokenClient) return true;
         try {
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
@@ -1196,18 +1201,36 @@
                         document.getElementById('up-btn').disabled = false;
                         document.getElementById('down-btn').disabled = false;
                         document.getElementById('auth-btn').innerText = "已連線";
+                    } else {
+                        document.getElementById('sync-status').innerText = "狀態：授權失敗，請重試。";
+                        document.getElementById('sync-status').style.color = "red";
                     }
                 },
             });
+            return true;
         } catch(e) {
             document.getElementById('sync-status').innerText = "狀態：雲端 SDK 載入失敗";
+            return false;
         }
+    }
+
+    window.onload = function () {
+        // 嘗試在 onload 時初始化（若 GSI 已載入）
+        initTokenClient();
         loadPrefs();
         renderAll();
         goHome();
     };
 
-    function handleAuth() { tokenClient.requestAccessToken({ prompt: 'consent' }); }
+    function handleAuth() {
+        // 延遲初始化：若 GSI 腳本在 onload 之後才完成載入，在此補初始化
+        if (!initTokenClient()) {
+            document.getElementById('sync-status').innerText = "狀態：Google 登入 SDK 尚未載入，請稍後再試。";
+            document.getElementById('sync-status').style.color = "red";
+            return;
+        }
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
     async function findBackupFile() {
         const res = await fetch("https://www.googleapis.com/drive/v3/files?q=name='palm_os_backup.json' and trashed=false", { headers: { Authorization: 'Bearer ' + accessToken } });
         const data = await res.json();
